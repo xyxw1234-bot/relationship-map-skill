@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "3.1.0"
+EXPECTED_VERSION = "3.1.1"
 
 
 def manifest_value(key):
@@ -69,6 +69,23 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("不得将欢迎文案缩短", install_contract)
         self.assertIn("五类能力", runtime_skill)
         self.assertIn(required[-1], runtime_skill)
+
+    def test_installer_uses_only_the_fast_state_aware_path(self):
+        installer = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        contract = (ROOT / "INSTALL.md").read_text(encoding="utf-8")
+        for marker in [
+            "单次终端调用", "hermes plugins list --plain --no-bundled",
+            "hermes plugins update relationship-map-vault",
+            "--force --enable", "hermes plugins enable relationship-map-vault",
+        ]:
+            self.assertIn(marker, installer)
+        for forbidden in [
+            "gateway restart", "discover_and_load", "sqlite3", "config.yaml",
+            "git status", "读取本文件、根目录 `plugin.yaml`",
+        ]:
+            self.assertNotIn(forbidden, installer)
+        self.assertIn("不得执行源码审查、测试、数据库探查、日志扫描、进程扫描或 Gateway 重启", contract)
+        self.assertIn("不写入任何安装自检记录", contract)
 
 
 if __name__ == "__main__":
