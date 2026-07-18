@@ -1,5 +1,5 @@
 name: relationship-map-vault
-version: 3.0.3
+version: 3.0.4
 manifest_version: 1
 description: "Durable relationship-map capability package with nine governed relationship-asset tools, visible recording markers, and a bundled Skill."
 author: Node Engine

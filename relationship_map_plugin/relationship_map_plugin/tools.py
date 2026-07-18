@@ -33,8 +33,6 @@ def vault_available() -> bool:
 def _handle_search(args: dict, **_: Any) -> str:
     try:
         query = str(args.get("query") or "").strip()
-        if not query:
-            raise ValueError("请提供姓名、城市、单位、角色或标签。")
         contacts = vault.find_contacts(query, int(args.get("limit", 20)))
         return _tool_result({"success": True, "contacts": contacts, "count": len(contacts)})
     except Exception as exc:
@@ -180,7 +178,7 @@ def _schema(name: str, description: str, properties: dict, required: list[str]) 
 
 
 TOOL_DEFINITIONS = (
-    ("relationship_map_search", _schema("relationship_map_search", "搜索当前用户的人脉资产。只返回必要摘要，不暴露电话、地址等敏感字段。", {"query": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 50}}, ["query"]), _handle_search),
+    ("relationship_map_search", _schema("relationship_map_search", "搜索当前用户的人脉资产；query 留空时返回当前人脉地图总览。只返回必要摘要，不暴露电话、地址等敏感字段。", {"query": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 50}}, []), _handle_search),
     ("relationship_map_contact", _schema("relationship_map_contact", "查看一位联系人的关系资料、最近互动与未完成承诺。", {"name": {"type": "string"}}, ["name"]), _handle_contact),
     ("relationship_map_record_interaction", _schema("relationship_map_record_interaction", "把明确的人脉互动追加到当前用户的时间线。普通记录自动保存，并返回用户可见的已记录提示。", {"name": {"type": "string"}, "summary": {"type": "string"}, "occurred_at": {"type": "string"}, "interaction_type": {"type": "string"}, "organization": {"type": "string"}, "city": {"type": "string"}, "role": {"type": "string"}, "certainty": {"type": "string", "enum": ["confirmed", "inferred", "pending"]}}, ["name", "summary"]), _handle_record_interaction),
     ("relationship_map_record_commitment", _schema("relationship_map_record_commitment", "记录一项明确承诺。不能把推断写成事实。", {"name": {"type": "string"}, "description": {"type": "string"}, "due_at": {"type": "string"}, "certainty": {"type": "string", "enum": ["confirmed", "inferred", "pending"]}}, ["name", "description"]), _handle_record_commitment),

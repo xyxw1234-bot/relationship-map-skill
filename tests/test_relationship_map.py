@@ -52,6 +52,12 @@ class RelationshipMapVaultTests(unittest.TestCase):
         self.assertEqual(1, len(vault.find_contacts("客户4999")))
         self.assertGreater(len(vault.find_contacts("A部门", limit=50)), 0)
 
+    def test_empty_search_returns_current_map_overview(self):
+        vault.record_interaction("王校长", "沟通研学试点", "2026-07-20T09:00:00+00:00")
+        result = vault.find_contacts("")
+        self.assertEqual(1, len(result))
+        self.assertEqual("王校长", result[0]["name"])
+
     def test_update_preserves_assets(self):
         vault.record_interaction("李校长", "研学合作沟通", "2026-07-20T09:00:00+00:00")
         vault.update_contact_classification("李校长", add_tags=["重点客户"], attributes={"客户等级": "A"})

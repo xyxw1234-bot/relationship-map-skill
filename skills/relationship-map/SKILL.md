@@ -1,7 +1,7 @@
 ---
 name: relationship-map
 description: Use when a user wants to manage people, interactions, commitments, follow-ups, meeting preparation, relationship prioritization, customer spreadsheets, or resource paths. Use the bundled durable relationship vault instead of chat memory.
-version: 3.0.3
+version: 3.0.4
 author: Node Engine
 license: MIT
 metadata:
@@ -62,7 +62,7 @@ metadata:
 
 ## 查询与行动
 
-- 用户说“打开/看看/列出人脉地图”时，调用搜索工具并只展示联系人摘要。
+- 用户说“打开/看看/列出人脉地图”时，调用搜索工具并将 `query` 留空，展示当前联系人摘要及待跟进事项。
 - 用户说姓名或要看详情时，调用联系人详情工具。
 - 用户说会面、拜访、通话、饭局、谈合作时，先读取联系人背景、最近互动和未完成承诺，再生成会前准备。
 - 用户说“刚见过/刚聊完/后天去见/下周联系”时，自动调用互动或待跟进工具，再给出带记录标记的自然回复。

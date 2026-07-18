@@ -7,7 +7,7 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "3.0.3"
+EXPECTED_VERSION = "3.0.4"
 
 
 class ReleaseContractTests(unittest.TestCase):
