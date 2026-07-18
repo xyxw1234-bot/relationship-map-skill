@@ -53,6 +53,23 @@ class ReleaseContractTests(unittest.TestCase):
             for line in path.read_text(encoding="utf-8").splitlines():
                 self.assertIsNone(re.match(r"^\d+\|", line), f"line-number artifact in {path}")
 
+    def test_install_paths_cannot_drift_back_to_short_welcome_copy(self):
+        installer = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+        after_install = (ROOT / "after-install.md").read_text(encoding="utf-8")
+        install_contract = (ROOT / "INSTALL.md").read_text(encoding="utf-8")
+        runtime_skill = (ROOT / "skills" / "relationship-map" / "SKILL.md").read_text(encoding="utf-8")
+        required = [
+            "① 🧭", "② 📝", "③ 🎯", "④ 🤝", "⑤ 📥",
+            "请介绍一下人脉地图的全部能力，以及我可以怎么样使用它。",
+        ]
+        for name, text in {"installer": installer, "after_install": after_install}.items():
+            for marker in required:
+                self.assertIn(marker, text, f"{name} missing welcome marker: {marker}")
+        self.assertIn("完整的手机端欢迎文案", install_contract)
+        self.assertIn("不得将欢迎文案缩短", install_contract)
+        self.assertIn("五类能力", runtime_skill)
+        self.assertIn(required[-1], runtime_skill)
+
 
 if __name__ == "__main__":
     unittest.main()
