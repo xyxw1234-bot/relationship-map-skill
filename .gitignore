@@ -1,28 +1,30 @@
 # Python runtime artifacts
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 
 # Local virtual environments
 .venv/
 venv/
 
+# Build and package artifacts
+build/
+dist/
+*.egg-info/
+
 # Local test and temporary data
 *.db
 *.sqlite
 *.sqlite3
+*.log
 /tmp/
 .temp/
+
+# Test and coverage artifacts
+.coverage
+.pytest_cache/
+htmlcov/
 
 # OS and editor noise
 .DS_Store
 .idea/
 .vscode/
-
-# Release validation cache
-.coverage
-.pytest_cache/
-
-
-
-
