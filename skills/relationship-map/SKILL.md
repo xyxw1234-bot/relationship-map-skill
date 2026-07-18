@@ -1,7 +1,7 @@
 ---
 name: relationship-map
 description: Use when a user wants to manage people, interactions, commitments, follow-ups, meeting preparation, relationship prioritization, customer spreadsheets, or resource paths. Use the bundled durable relationship vault instead of chat memory.
-version: 3.0.4
+version: 3.1.0
 author: Node Engine
 license: MIT
 metadata:
@@ -60,9 +60,16 @@ metadata:
 
 客户库可能包含数千行。不要把全部联系人或原表全文塞进对话；应使用查询、筛选、标签和分组能力处理。
 
+## 地图总览、排序与移动端浏览
+
+用户说“打开/看看/列出人脉地图”“我一共有多少人脉”时，调用 `relationship_map_overview`，默认 `limit=20`、`offset=0`、`sort_by=recent_interaction`。先说总人数和当前展示范围，再每人只展示：姓名、地域/单位/核心岗位、关系热度、最近互动、下一步。不得展开联系人完整详情、电话、地址、长时间线或备注。
+
+用户说“继续”“再展示一些”“下一页”时，沿用上一轮 `query`、`sort_by` 与工具返回的 `next_offset`，每次默认再展示 20 人。只有用户明确说“全部展示”时，才提高 `limit` 或连续展示；仍应先提示总人数和移动端阅读成本。
+
+用户说“按沟通频次排序”“谁最常联系”时，调用总览并传 `sort_by=interaction_frequency`；说“按热度/关系冷热排序”时传 `relationship_heat`；说“谁该优先联系/按待办日期排”时传 `followup_due`；说“按最近沟通排序”时传 `recent_interaction`；说“按姓名”时传 `name`。热度、频次和优先级只陈述已保存互动与待办所支持的结果；说明它是基于互动次数和最近互动时间的运营信号，不把它伪装成对关系的绝对事实。
+
 ## 查询与行动
 
-- 用户说“打开/看看/列出人脉地图”时，调用搜索工具并将 `query` 留空，展示当前联系人摘要及待跟进事项。
 - 用户说姓名或要看详情时，调用联系人详情工具。
 - 用户说会面、拜访、通话、饭局、谈合作时，先读取联系人背景、最近互动和未完成承诺，再生成会前准备。
 - 用户说“刚见过/刚聊完/后天去见/下周联系”时，自动调用互动或待跟进工具，再给出带记录标记的自然回复。

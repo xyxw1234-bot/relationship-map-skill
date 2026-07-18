@@ -3,54 +3,55 @@ import tomllib
 import unittest
 from pathlib import Path
 
-import yaml
-
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "3.0.4"
+EXPECTED_VERSION = "3.1.0"
+
+
+def manifest_value(key):
+    for line in (ROOT / "plugin.yaml").read_text(encoding="utf-8").splitlines():
+        if line.startswith(f"{key}:"):
+            return line.split(":", 1)[1].strip().strip('"')
+    raise AssertionError(f"missing manifest key: {key}")
+
+
+def manifest_tools():
+    lines = (ROOT / "plugin.yaml").read_text(encoding="utf-8").splitlines()
+    start = lines.index("provides_tools:") + 1
+    return [line.strip()[2:] for line in lines[start:] if line.startswith("  - ")]
 
 
 class ReleaseContractTests(unittest.TestCase):
-    def test_release_versions_are_unified(self):
-        manifest = yaml.safe_load((ROOT / "plugin.yaml").read_text(encoding="utf-8"))
+    def test_versions_and_public_contract_are_unified(self):
         project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         installer = (ROOT / "SKILL.md").read_text(encoding="utf-8")
-        runtime_skill = (ROOT / "skills" / "relationship-map" / "SKILL.md").read_text(encoding="utf-8")
-        install_contract = (ROOT / "INSTALL.md").read_text(encoding="utf-8")
-
-        self.assertEqual(EXPECTED_VERSION, manifest["version"])
+        runtime = (ROOT / "skills" / "relationship-map" / "SKILL.md").read_text(encoding="utf-8")
+        install = (ROOT / "INSTALL.md").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertEqual(EXPECTED_VERSION, manifest_value("version"))
         self.assertEqual(EXPECTED_VERSION, project["project"]["version"])
         self.assertIn(f"version: {EXPECTED_VERSION}", installer)
-        self.assertIn(f"version: {EXPECTED_VERSION}", runtime_skill)
-        self.assertIn(f"relationship-map-vault@{EXPECTED_VERSION}", install_contract)
-        self.assertIn("/main/SKILL.md", install_contract)
+        self.assertIn(f"version: {EXPECTED_VERSION}", runtime)
+        self.assertIn(f"relationship-map-vault@{EXPECTED_VERSION}", install)
+        self.assertIn(f"v{EXPECTED_VERSION}", readme)
+        self.assertIn(f"## v{EXPECTED_VERSION}", changelog)
+        self.assertIn("/main/SKILL.md", install)
 
-    def test_distribution_has_one_plugin_manifest_and_one_runtime_skill(self):
-        self.assertTrue((ROOT / "plugin.yaml").is_file())
+    def test_manifest_equals_registered_tool_contract(self):
+        from relationship_map_plugin.relationship_map_plugin.tools import TOOL_DEFINITIONS
+        self.assertEqual([name for name, _, _ in TOOL_DEFINITIONS], manifest_tools())
+        self.assertEqual(10, len(manifest_tools()))
+
+    def test_single_root_plugin_and_clean_public_skill_files(self):
         self.assertTrue((ROOT / "__init__.py").is_file())
         self.assertTrue((ROOT / "after-install.md").is_file())
         self.assertTrue((ROOT / "skills" / "relationship-map" / "SKILL.md").is_file())
         self.assertFalse((ROOT / "relationship_map_plugin" / "plugin.yaml").exists())
         self.assertFalse((ROOT / "relationship_map_plugin" / "skills").exists())
-        self.assertFalse((ROOT / "人脉地图").exists())
-
-    def test_public_text_has_no_line_number_prefix_artifacts(self):
-        for path in [
-            ROOT / "SKILL.md",
-            ROOT / "after-install.md",
-            ROOT / "skills" / "relationship-map" / "SKILL.md",
-        ]:
+        for path in (ROOT / "SKILL.md", ROOT / "after-install.md", ROOT / "skills" / "relationship-map" / "SKILL.md"):
             for line in path.read_text(encoding="utf-8").splitlines():
-                self.assertIsNone(re.match(r"^\d+\|", line), f"{path}: {line}")
-
-    def test_manifest_declares_all_runtime_tools(self):
-        manifest = yaml.safe_load((ROOT / "plugin.yaml").read_text(encoding="utf-8"))
-        from relationship_map_plugin.relationship_map_plugin.tools import TOOL_DEFINITIONS
-
-        self.assertEqual(
-            [name for name, _, _ in TOOL_DEFINITIONS],
-            manifest["provides_tools"],
-        )
+                self.assertIsNone(re.match(r"^\d+\|", line), f"line-number artifact in {path}")
 
 
 if __name__ == "__main__":

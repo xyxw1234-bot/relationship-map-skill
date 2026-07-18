@@ -391,6 +391,139 @@ def meeting_context(name: str) -> dict[str, Any] | None:
         return contact
 
 
+def _parse_timestamp(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _relationship_heat(interaction_count: int, latest_at: str | None) -> dict[str, Any]:
+    """Return an explainable, deterministic relationship heat label."""
+    score = min(interaction_count, 12) * 8
+    latest = _parse_timestamp(latest_at)
+    if latest is not None:
+        age_days = max(0, (datetime.now(UTC) - latest.astimezone(UTC)).days)
+        if age_days <= 7:
+            score += 40
+        elif age_days <= 30:
+            score += 25
+        elif age_days <= 90:
+            score += 10
+    else:
+        age_days = None
+    if score >= 45:
+        label = "热"
+    elif score >= 25:
+        label = "温"
+    elif score >= 10:
+        label = "常"
+    else:
+        label = "冷"
+    return {"label": label, "score": score, "interaction_count": interaction_count, "latest_interaction_at": latest_at, "days_since_latest": age_days}
+
+
+def browse_contacts(query: str = "", limit: int = 20, offset: int = 0, sort_by: str = "recent_interaction") -> dict[str, Any]:
+    """Return a mobile-friendly, paginated relationship-map overview.
+
+    The server calculates ordering from persisted interactions and open follow-ups
+    so natural-language requests do not depend on an LLM inventing a ranking.
+    """
+    initialise()
+    owner_id = safe_owner_id()
+    needle = f"%{query.strip()}%"
+    safe_limit = max(1, min(int(limit), 500))
+    safe_offset = max(0, int(offset))
+    allowed_sorts = {"recent_interaction", "interaction_frequency", "relationship_heat", "followup_due", "name"}
+    if sort_by not in allowed_sorts:
+        raise ValueError("排序方式仅支持 recent_interaction、interaction_frequency、relationship_heat、followup_due 或 name。")
+    with connection() as db:
+        # Aggregate interaction and follow-up information in SQL. This avoids the
+        # prior N+1 query pattern when a user has hundreds or thousands of contacts.
+        rows = db.execute(
+            """WITH filtered_contacts AS (
+                   SELECT c.* FROM contacts c
+                   WHERE c.owner_id = ? AND c.status = 'active'
+                     AND (
+                        c.name LIKE ? OR COALESCE(c.organization, '') LIKE ?
+                        OR COALESCE(c.city, '') LIKE ? OR COALESCE(c.role, '') LIKE ?
+                        OR EXISTS (SELECT 1 FROM tags t WHERE t.contact_id = c.id AND t.tag LIKE ?)
+                        OR EXISTS (SELECT 1 FROM contact_attributes a WHERE a.contact_id = c.id AND (a.field_name LIKE ? OR a.value_json LIKE ?))
+                     )
+               ), interaction_stats AS (
+                   SELECT contact_id, COUNT(*) AS interaction_count, MAX(occurred_at) AS latest_at
+                   FROM interactions WHERE owner_id = ? GROUP BY contact_id
+               ), ranked_followups AS (
+                   SELECT contact_id, title, due_at,
+                          ROW_NUMBER() OVER (
+                              PARTITION BY contact_id
+                              ORDER BY CASE WHEN due_at IS NULL THEN 1 ELSE 0 END, due_at ASC, created_at ASC
+                          ) AS ordinal
+                   FROM followups WHERE owner_id = ? AND status = 'open'
+               )
+               SELECT c.id, c.name, c.city, c.organization, c.role,
+                      COALESCE(i.interaction_count, 0) AS interaction_count, i.latest_at,
+                      f.title AS followup_title, f.due_at AS followup_due_at
+               FROM filtered_contacts c
+               LEFT JOIN interaction_stats i ON i.contact_id = c.id
+               LEFT JOIN ranked_followups f ON f.contact_id = c.id AND f.ordinal = 1
+            """,
+            (owner_id, needle, needle, needle, needle, needle, needle, needle, owner_id, owner_id),
+        ).fetchall()
+        summaries: list[dict[str, Any]] = []
+        for row in rows:
+            latest_at = row["latest_at"]
+            interaction_count = int(row["interaction_count"])
+            summaries.append({
+                "id": row["id"],
+                "name": row["name"],
+                "city": row["city"],
+                "organization": row["organization"],
+                "role": row["role"],
+                "tags": [],
+                "latest_interaction": {"occurred_at": latest_at} if latest_at else None,
+                "next_followup": {"title": row["followup_title"], "due_at": row["followup_due_at"]} if row["followup_title"] else None,
+                "interaction_count": interaction_count,
+                "heat": _relationship_heat(interaction_count, latest_at),
+            })
+    if sort_by == "name":
+        summaries.sort(key=lambda item: item["name"])
+    elif sort_by == "interaction_frequency":
+        summaries.sort(key=lambda item: (item["interaction_count"], item["heat"]["latest_interaction_at"] or "", item["name"]), reverse=True)
+    elif sort_by == "relationship_heat":
+        summaries.sort(key=lambda item: (item["heat"]["score"], item["interaction_count"], item["heat"]["latest_interaction_at"] or "", item["name"]), reverse=True)
+    elif sort_by == "followup_due":
+        summaries.sort(key=lambda item: (0 if item["next_followup"] else 1, (item["next_followup"] or {}).get("due_at") or "9999-12-31", item["name"]))
+    else:
+        summaries.sort(key=lambda item: (item["heat"]["latest_interaction_at"] or "", item["name"]), reverse=True)
+    page = summaries[safe_offset:safe_offset + safe_limit]
+    if page:
+        with connection() as db:
+            placeholders = ", ".join("?" for _ in page)
+            tag_rows = db.execute(
+                f"SELECT contact_id, tag FROM tags WHERE contact_id IN ({placeholders}) ORDER BY tag",
+                [item["id"] for item in page],
+            ).fetchall()
+        tags_by_contact: dict[str, list[str]] = {item["id"]: [] for item in page}
+        for tag_row in tag_rows:
+            tags_by_contact[tag_row["contact_id"]].append(tag_row["tag"])
+        for item in page:
+            item["tags"] = tags_by_contact[item.pop("id")]
+    next_offset = safe_offset + len(page)
+    return {
+        "total": len(summaries),
+        "offset": safe_offset,
+        "limit": safe_limit,
+        "contacts": page,
+        "has_more": next_offset < len(summaries),
+        "next_offset": next_offset if next_offset < len(summaries) else None,
+        "sort_by": sort_by,
+        "query": query.strip(),
+    }
+
+
 def vault_status() -> dict[str, Any]:
     initialise()
     owner_id = safe_owner_id()

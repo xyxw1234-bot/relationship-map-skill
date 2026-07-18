@@ -39,6 +39,23 @@ def _handle_search(args: dict, **_: Any) -> str:
         return _tool_error(exc)
 
 
+def _handle_overview(args: dict, **_: Any) -> str:
+    try:
+        overview = vault.browse_contacts(
+            query=str(args.get("query") or ""),
+            limit=int(args.get("limit", 20)),
+            offset=int(args.get("offset", 0)),
+            sort_by=str(args.get("sort_by") or "recent_interaction"),
+        )
+        return _tool_result({
+            "success": True,
+            "overview": overview,
+            "instruction": "这是移动端人脉地图摘要页：先说明总人数和当前展示范围；每人只展示姓名、地域/单位/岗位、热度、最近互动和下一步。默认不超过 20 人。has_more 为 true 时，询问用户是否继续展示下一组；只有用户明确要求全部时，才提高 limit 或连续展示。热度、频次、待跟进排序均为基于已保存数据的结果；不要把分数或推断说成事实。",
+        })
+    except Exception as exc:
+        return _tool_error(exc)
+
+
 def _handle_contact(args: dict, **_: Any) -> str:
     try:
         name = str(args.get("name") or "").strip()
@@ -179,6 +196,7 @@ def _schema(name: str, description: str, properties: dict, required: list[str]) 
 
 TOOL_DEFINITIONS = (
     ("relationship_map_search", _schema("relationship_map_search", "搜索当前用户的人脉资产；query 留空时返回当前人脉地图总览。只返回必要摘要，不暴露电话、地址等敏感字段。", {"query": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 50}}, []), _handle_search),
+    ("relationship_map_overview", _schema("relationship_map_overview", "按移动端摘要形式浏览当前用户人脉地图。返回总人数、分页联系人摘要、热度、互动频次和待跟进事项；支持按近期互动、互动频次、关系热度、待办日期或姓名排序。", {"query": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 500}, "offset": {"type": "integer", "minimum": 0}, "sort_by": {"type": "string", "enum": ["recent_interaction", "interaction_frequency", "relationship_heat", "followup_due", "name"]}}, []), _handle_overview),
     ("relationship_map_contact", _schema("relationship_map_contact", "查看一位联系人的关系资料、最近互动与未完成承诺。", {"name": {"type": "string"}}, ["name"]), _handle_contact),
     ("relationship_map_record_interaction", _schema("relationship_map_record_interaction", "把明确的人脉互动追加到当前用户的时间线。普通记录自动保存，并返回用户可见的已记录提示。", {"name": {"type": "string"}, "summary": {"type": "string"}, "occurred_at": {"type": "string"}, "interaction_type": {"type": "string"}, "organization": {"type": "string"}, "city": {"type": "string"}, "role": {"type": "string"}, "certainty": {"type": "string", "enum": ["confirmed", "inferred", "pending"]}}, ["name", "summary"]), _handle_record_interaction),
     ("relationship_map_record_commitment", _schema("relationship_map_record_commitment", "记录一项明确承诺。不能把推断写成事实。", {"name": {"type": "string"}, "description": {"type": "string"}, "due_at": {"type": "string"}, "certainty": {"type": "string", "enum": ["confirmed", "inferred", "pending"]}}, ["name", "description"]), _handle_record_commitment),
