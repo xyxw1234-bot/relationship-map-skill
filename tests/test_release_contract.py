@@ -23,7 +23,7 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn(f"version: {EXPECTED_VERSION}", installer)
         self.assertIn(f"version: {EXPECTED_VERSION}", runtime_skill)
         self.assertIn(f"relationship-map-vault@{EXPECTED_VERSION}", install_contract)
-        self.assertIn(f"/v{EXPECTED_VERSION}/SKILL.md", install_contract)
+        self.assertIn("/main/SKILL.md", install_contract)
 
     def test_distribution_has_one_plugin_manifest_and_one_runtime_skill(self):
         self.assertTrue((ROOT / "plugin.yaml").is_file())

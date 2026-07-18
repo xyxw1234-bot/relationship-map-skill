@@ -1,8 +1,10 @@
 # 人脉地图能力包安装契约
 
-正式用户智能体链接：
+正式用户智能体链接〔固定活链接〕：
 
-`https://raw.githubusercontent.com/xyxw1234-bot/relationship-map-skill/v3.0.3/SKILL.md`
+`https://raw.githubusercontent.com/xyxw1234-bot/relationship-map-skill/main/SKILL.md`
+
+该链接始终读取 `main` 的最新正式能力包。`v3.0.3` 等 Tag 仅用于回滚、审计与复现，不作为用户安装入口。
 
 能力包标识：`relationship-map-vault@3.0.3`。
 

@@ -6,9 +6,11 @@
 
 ## 用户安装
 
-在支持 Hermes 插件的节点引擎中，用户只需要发送本仓库的正式安装链接并说“安装人脉地图”。安装运行时应自动完成：
+固定活链接：`https://raw.githubusercontent.com/xyxw1234-bot/relationship-map-skill/main/SKILL.md`
 
-1. 校验固定版本的能力包；
+用户把这一个链接发送给支持 Hermes 插件的节点引擎，并说“安装人脉地图”。后续正式更新会沿用同一链接；版本 Tag 仅保留给回滚和审计。安装运行时应自动完成：
+
+1. 校验当前正式能力包；
 2. 安装并启用 `relationship-map-vault` 插件；
 3. 加载捆绑的 `relationship-map` Skill；
 4. 初始化当前用户的独立关系资产空间；
