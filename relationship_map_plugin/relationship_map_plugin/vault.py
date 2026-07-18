@@ -240,10 +240,11 @@ def find_contacts(query: str, limit: int = 20) -> list[dict[str, Any]]:
         rows = db.execute(
             """SELECT DISTINCT c.* FROM contacts c
                LEFT JOIN tags t ON t.contact_id = c.id
+               LEFT JOIN contact_attributes a ON a.contact_id = c.id
                WHERE c.owner_id = ? AND c.status = 'active'
-                 AND (c.name LIKE ? OR COALESCE(c.organization, '') LIKE ? OR COALESCE(c.city, '') LIKE ? OR COALESCE(c.role, '') LIKE ? OR COALESCE(t.tag, '') LIKE ?)
+                 AND (c.name LIKE ? OR COALESCE(c.organization, '') LIKE ? OR COALESCE(c.city, '') LIKE ? OR COALESCE(c.role, '') LIKE ? OR COALESCE(t.tag, '') LIKE ? OR COALESCE(a.field_name, '') LIKE ? OR COALESCE(a.value_json, '') LIKE ?)
                ORDER BY c.updated_at DESC LIMIT ?""",
-            (owner_id, needle, needle, needle, needle, needle, max(1, min(int(limit), 50))),
+            (owner_id, needle, needle, needle, needle, needle, needle, needle, max(1, min(int(limit), 50))),
         ).fetchall()
         return [_row_to_contact(db, row) for row in rows]
 
