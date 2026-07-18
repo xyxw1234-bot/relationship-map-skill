@@ -18,12 +18,8 @@ def _tool_result(payload: dict[str, Any]) -> str:
 
 
 def _tool_error(exc: Exception) -> str:
-    try:
-        from tools.registry import tool_error
-        return tool_error(str(exc))
-    except ImportError:
-        import json
-        return json.dumps({"success": False, "error": str(exc)}, ensure_ascii=False)
+    import json
+    return json.dumps({"success": False, "error": str(exc)}, ensure_ascii=False)
 
 
 def vault_available() -> bool:
