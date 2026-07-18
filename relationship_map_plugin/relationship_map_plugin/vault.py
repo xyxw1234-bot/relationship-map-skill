@@ -19,7 +19,7 @@ from typing import Any, Iterator
 from uuid import uuid4
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 3
 
 
 def utc_now() -> str:
@@ -102,6 +102,17 @@ def initialise() -> None:
                 created_at TEXT NOT NULL,
                 PRIMARY KEY(contact_id, tag)
             );
+            CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag);
+            CREATE TABLE IF NOT EXISTS contact_attributes (
+                contact_id TEXT NOT NULL REFERENCES contacts(id),
+                field_name TEXT NOT NULL,
+                value_json TEXT NOT NULL,
+                source TEXT NOT NULL DEFAULT 'user',
+                certainty TEXT NOT NULL DEFAULT 'confirmed',
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY(contact_id, field_name)
+            );
+            CREATE INDEX IF NOT EXISTS idx_contact_attributes_field ON contact_attributes(field_name);
             CREATE TABLE IF NOT EXISTS interactions (
                 id TEXT PRIMARY KEY,
                 owner_id TEXT NOT NULL,
@@ -136,6 +147,22 @@ def initialise() -> None:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS source_documents (
+                id TEXT PRIMARY KEY,
+                owner_id TEXT NOT NULL,
+                original_name TEXT NOT NULL,
+                snapshot_path TEXT NOT NULL,
+                sha256 TEXT NOT NULL,
+                imported_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS import_batches (
+                id TEXT PRIMARY KEY,
+                owner_id TEXT NOT NULL,
+                source_id TEXT NOT NULL REFERENCES source_documents(id),
+                row_count INTEGER NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_import_batches_owner ON import_batches(owner_id, created_at DESC);
             CREATE TABLE IF NOT EXISTS audit_events (
                 id TEXT PRIMARY KEY,
                 owner_id TEXT NOT NULL,
@@ -177,6 +204,10 @@ def _audit(db: sqlite3.Connection, owner_id: str, action: str, entity_type: str,
 def _row_to_contact(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
     contact_id = row["id"]
     tags = [r["tag"] for r in db.execute("SELECT tag FROM tags WHERE contact_id = ? ORDER BY tag", (contact_id,))]
+    attributes = {
+        item["field_name"]: json.loads(item["value_json"])
+        for item in db.execute("SELECT field_name, value_json FROM contact_attributes WHERE contact_id = ? ORDER BY field_name", (contact_id,))
+    }
     latest = db.execute(
         "SELECT occurred_at, summary FROM interactions WHERE contact_id = ? ORDER BY occurred_at DESC, created_at DESC LIMIT 1",
         (contact_id,),
@@ -193,6 +224,7 @@ def _row_to_contact(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
         "role": row["role"],
         "notes": row["notes"],
         "tags": tags,
+        "attributes": attributes,
         "latest_interaction": dict(latest) if latest else None,
         "next_followup": dict(followup) if followup else None,
         "status": row["status"],
@@ -286,6 +318,35 @@ def record_commitment(name: str, description: str, due_at: str | None = None, ce
         )
         _audit(db, owner_id, "append", "commitment", commitment_id, {"contact_id": contact_id, "certainty": certainty})
     return {"contact_created": created, "contact_name": name.strip(), "commitment_id": commitment_id}
+
+
+def update_contact_classification(name: str, add_tags: list[str] | None = None, remove_tags: list[str] | None = None, attributes: dict[str, Any] | None = None, certainty: str = "confirmed") -> dict[str, Any]:
+    """Apply user-requested flexible labels or fields to one existing contact."""
+    initialise()
+    owner_id = safe_owner_id()
+    with connection() as db:
+        contact_id, created = _resolve_or_create_contact(db, owner_id, name.strip())
+        now = utc_now()
+        added = []
+        for tag in sorted({str(tag).strip() for tag in (add_tags or []) if str(tag).strip()}):
+            db.execute("INSERT OR IGNORE INTO tags(contact_id, tag, source, created_at) VALUES (?, ?, ?, ?)", (contact_id, tag, "user", now))
+            added.append(tag)
+        removed = []
+        for tag in sorted({str(tag).strip() for tag in (remove_tags or []) if str(tag).strip()}):
+            db.execute("DELETE FROM tags WHERE contact_id = ? AND tag = ?", (contact_id, tag))
+            removed.append(tag)
+        changed_fields = []
+        for field_name, value in (attributes or {}).items():
+            key = str(field_name).strip()
+            if not key:
+                continue
+            db.execute(
+                "INSERT INTO contact_attributes(contact_id, field_name, value_json, source, certainty, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(contact_id, field_name) DO UPDATE SET value_json=excluded.value_json, source=excluded.source, certainty=excluded.certainty, updated_at=excluded.updated_at",
+                (contact_id, key, json.dumps(value, ensure_ascii=False), "user", certainty, now),
+            )
+            changed_fields.append(key)
+        _audit(db, owner_id, "classify", "contact", contact_id, {"add_tags": added, "remove_tags": removed, "attributes": changed_fields, "certainty": certainty})
+    return {"contact_created": created, "contact_name": name.strip(), "added_tags": added, "removed_tags": removed, "updated_fields": changed_fields}
 
 
 def create_followup(name: str, title: str, due_at: str | None = None) -> dict[str, Any]:

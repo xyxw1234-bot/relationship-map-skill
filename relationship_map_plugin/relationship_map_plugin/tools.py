@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from . import spreadsheet
 from . import vault
 
 
@@ -112,6 +113,53 @@ def _handle_create_followup(args: dict, **_: Any) -> str:
         return _tool_error(exc)
 
 
+def _handle_import_spreadsheet(args: dict, **_: Any) -> str:
+    try:
+        result = spreadsheet.import_spreadsheet(
+            file_path=str(args.get("file_path") or ""),
+            mapping=args.get("mapping") or None,
+            default_tags=args.get("default_tags") or [],
+        )
+        return _tool_result({
+            "success": True,
+            "import": result,
+            "user_notice": f"已记录到人脉地图：已导入 {result['imported']} 位联系人。",
+            "instruction": "在回复中展示 user_notice。原表已作为资料快照保留；不要声称已修改用户原始表格。根据导入列和样本自动补充标签与分类建议。",
+        })
+    except Exception as exc:
+        return _tool_error(exc)
+
+
+def _handle_preview_spreadsheet(args: dict, **_: Any) -> str:
+    try:
+        result = spreadsheet.preview(str(args.get("file_path") or ""))
+        return _tool_result({"success": True, "preview": result, "instruction": "这是内部解析预览。若姓名列已识别，继续自动调用导入工具；不要向用户询问数据库或技术配置。"})
+    except Exception as exc:
+        return _tool_error(exc)
+
+
+def _handle_classify_contact(args: dict, **_: Any) -> str:
+    try:
+        saved = vault.update_contact_classification(
+            name=str(args.get("name") or ""),
+            add_tags=args.get("add_tags") or [],
+            remove_tags=args.get("remove_tags") or [],
+            attributes=args.get("attributes") or {},
+            certainty=str(args.get("certainty") or "confirmed"),
+        )
+        changes = []
+        if saved["added_tags"]:
+            changes.append("新增标签“" + "、".join(saved["added_tags"]) + "”")
+        if saved["removed_tags"]:
+            changes.append("移除标签“" + "、".join(saved["removed_tags"]) + "”")
+        if saved["updated_fields"]:
+            changes.append("更新“" + "、".join(saved["updated_fields"]) + "”")
+        summary = "；".join(changes) or "更新分类信息"
+        return _tool_result({"success": True, "saved": saved, "user_notice": f"已更新到人脉地图：{saved['contact_name']}，{summary}。", "instruction": "在给用户的自然语言回复中展示 user_notice。"})
+    except Exception as exc:
+        return _tool_error(exc)
+
+
 def _handle_prepare_meeting(args: dict, **_: Any) -> str:
     try:
         name = str(args.get("name") or "").strip()
@@ -141,5 +189,8 @@ TOOL_DEFINITIONS = (
     ("relationship_map_record_interaction", _schema("relationship_map_record_interaction", "把明确的人脉互动追加到当前用户的时间线。普通记录自动保存，并返回用户可见的已记录提示。", {"name": {"type": "string"}, "summary": {"type": "string"}, "occurred_at": {"type": "string"}, "interaction_type": {"type": "string"}, "organization": {"type": "string"}, "city": {"type": "string"}, "role": {"type": "string"}, "certainty": {"type": "string", "enum": ["confirmed", "inferred", "pending"]}}, ["name", "summary"]), _handle_record_interaction),
     ("relationship_map_record_commitment", _schema("relationship_map_record_commitment", "记录一项明确承诺。不能把推断写成事实。", {"name": {"type": "string"}, "description": {"type": "string"}, "due_at": {"type": "string"}, "certainty": {"type": "string", "enum": ["confirmed", "inferred", "pending"]}}, ["name", "description"]), _handle_record_commitment),
     ("relationship_map_create_followup", _schema("relationship_map_create_followup", "创建一项待跟进事项。普通待办自动保存，并返回用户可见的已更新提示。", {"name": {"type": "string"}, "title": {"type": "string"}, "due_at": {"type": "string"}}, ["name", "title"]), _handle_create_followup),
+    ("relationship_map_preview_spreadsheet", _schema("relationship_map_preview_spreadsheet", "读取 CSV 或 XLSX 的表头、样本和字段映射建议，用于内部自动导入准备。", {"file_path": {"type": "string"}}, ["file_path"]), _handle_preview_spreadsheet),
+    ("relationship_map_import_spreadsheet", _schema("relationship_map_import_spreadsheet", "把 CSV 或 XLSX 客户资料导入当前用户的人脉地图，保留原文件快照，自动建立联系人、标签和自定义字段。", {"file_path": {"type": "string"}, "mapping": {"type": "object"}, "default_tags": {"type": "array", "items": {"type": "string"}}}, ["file_path"]), _handle_import_spreadsheet),
+    ("relationship_map_classify_contact", _schema("relationship_map_classify_contact", "为联系人添加或移除任意自定义标签，并保存任意自定义字段。用户明确要求的分类和字段更新自动保存。", {"name": {"type": "string"}, "add_tags": {"type": "array", "items": {"type": "string"}}, "remove_tags": {"type": "array", "items": {"type": "string"}}, "attributes": {"type": "object"}, "certainty": {"type": "string", "enum": ["confirmed", "inferred", "pending"]}}, ["name"]), _handle_classify_contact),
     ("relationship_map_prepare_meeting", _schema("relationship_map_prepare_meeting", "读取已有关系资产，为会面准备可信的背景、最近互动、承诺和风险提示。", {"name": {"type": "string"}, "meeting_at": {"type": "string"}}, ["name"]), _handle_prepare_meeting),
 )
