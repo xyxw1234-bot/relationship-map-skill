@@ -1,7 +1,7 @@
 ---
 name: relationship-map
 description: Use when a user wants to manage people, interactions, commitments, follow-ups, meeting preparation, relationship prioritization, customer spreadsheets, or resource paths. Use the bundled durable relationship vault instead of chat memory.
-version: 3.1.1
+version: 3.1.2
 author: Node Engine
 license: MIT
 metadata:

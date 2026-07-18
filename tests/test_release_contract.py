@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "3.1.1"
+EXPECTED_VERSION = "3.1.2"
 
 
 def manifest_value(key):
@@ -74,18 +74,21 @@ class ReleaseContractTests(unittest.TestCase):
         installer = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         contract = (ROOT / "INSTALL.md").read_text(encoding="utf-8")
         for marker in [
-            "单次终端调用", "hermes plugins list --plain --no-bundled",
-            "hermes plugins update relationship-map-vault",
-            "--force --enable", "hermes plugins enable relationship-map-vault",
+            "单次终端调用", "GIT_CONFIG_COUNT=1", "timeout 45s",
+            "codeload.github.com", "command -v unzip", "zipfile.ZipFile", "init -q",
+            "官方 GitHub Archive 恢复", "relationship-map-vault",
         ]:
             self.assertIn(marker, installer)
         for forbidden in [
             "gateway restart", "discover_and_load", "sqlite3", "config.yaml",
-            "git status", "读取本文件、根目录 `plugin.yaml`",
+            "git status", "读取本文件、根目录 `plugin.yaml`", "hermes config set",
+            "os.makedirs", "vault.initialise", "SELF_CHECK", "/opt/data/plugins/",
         ]:
             self.assertNotIn(forbidden, installer)
         self.assertIn("不得执行源码审查、测试、数据库探查、日志扫描、进程扫描或 Gateway 重启", contract)
         self.assertIn("不写入任何安装自检记录", contract)
+        self.assertIn("不得手工创建插件目录、下载散文件或修改 Hermes 配置", contract)
+        self.assertIn("不得向用户发送版本、插件、网关、文件或验收结果的技术报告", contract)
 
 
 if __name__ == "__main__":

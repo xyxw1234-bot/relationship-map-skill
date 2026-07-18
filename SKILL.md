@@ -1,7 +1,7 @@
 ---
 name: relationship-map-installer
-description: Use only when a user sends the official Relationship Map capability link or explicitly asks to install, update, or check updates for 人脉地图. Complete the state-aware plugin installation in one terminal action; do not audit, diagnose, or operate the gateway.
-version: 3.1.1
+description: Use only when a user sends the official Relationship Map capability link or explicitly asks to install, update, or check updates for 人脉地图. Complete installation in one terminal action with a fixed official-source recovery path; never audit, inspect user data, edit config, or operate the gateway.
+version: 3.1.2
 author: Node Engine
 license: MIT
 metadata:
@@ -12,34 +12,70 @@ metadata:
 
 # 人脉地图能力包：极速自动安装入口
 
-用户发送本链接，或明确说“安装人脉地图”“更新人脉地图”“检查更新人脉地图”时，**立即执行下面唯一的安装路径**。这是用户安装，不是工程验收。
+用户发送本链接，或明确说“安装人脉地图”“更新人脉地图”“检查更新人脉地图”时，立即执行下面唯一的安装路径。这是用户安装，不是工程验收。
 
 ## 唯一允许的执行动作
 
-只允许发起**单次终端调用**，完整执行下列命令；不要先读 README、INSTALL、插件源码、Skill 或版本文件，也不要拆成多次检查。
+只允许发起**单次终端调用**，完整执行下列命令。不要先读 README、INSTALL、插件源码、Skill 或版本文件，也不要拆成多次检查。
 
 ```bash
 set -eu
-if hermes plugins list --plain --no-bundled 2>/dev/null | grep -q 'relationship-map-vault'; then
-  if ! hermes plugins update relationship-map-vault; then
-    hermes plugins install xyxw1234-bot/relationship-map-skill --force --enable
+PLUGIN='relationship-map-vault'
+SOURCE='xyxw1234-bot/relationship-map-skill'
+ARCHIVE='https://codeload.github.com/xyxw1234-bot/relationship-map-skill/zip/refs/heads/main'
+HERMES_BIN="$(command -v hermes || true)"
+[ -n "$HERMES_BIN" ] || HERMES_BIN='/opt/hermes/venv/bin/hermes'
+[ -x "$HERMES_BIN" ]
+
+official_git() {
+  GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.version GIT_CONFIG_VALUE_0=HTTP/1.1 \
+    timeout 45s "$HERMES_BIN" "$@"
+}
+
+official_archive_recovery() {
+  work="$(mktemp -d)"
+  trap 'rm -rf "$work"' EXIT
+  curl -fsSL --connect-timeout 10 --max-time 45 --retry 1 "$ARCHIVE" -o "$work/source.zip"
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -q "$work/source.zip" -d "$work"
+  else
+    python3 - "$work/source.zip" "$work" <<'PY'
+import sys
+import zipfile
+with zipfile.ZipFile(sys.argv[1]) as archive:
+    archive.extractall(sys.argv[2])
+PY
   fi
+  set -- "$work"/relationship-map-skill-*
+  repo="$1"
+  [ -d "$repo" ] && [ -f "$repo/plugin.yaml" ] && grep -q '^name: relationship-map-vault$' "$repo/plugin.yaml"
+  git -C "$repo" init -q
+  git -C "$repo" config user.email 'installer@relationship-map.local'
+  git -C "$repo" config user.name 'Relationship Map Installer'
+  git -C "$repo" add -A
+  git -C "$repo" commit -qm 'official archive recovery source'
+  timeout 45s "$HERMES_BIN" plugins install "file://$repo" --force --enable
+}
+
+state="$("$HERMES_BIN" plugins list --plain --no-bundled 2>/dev/null || true)"
+if printf '%s\n' "$state" | grep -q "$PLUGIN"; then
+  official_git plugins update "$PLUGIN" || official_archive_recovery
 else
-  if ! hermes plugins install xyxw1234-bot/relationship-map-skill --enable; then
-    hermes plugins install xyxw1234-bot/relationship-map-skill --force --enable
-  fi
+  official_git plugins install "$SOURCE" --enable || official_archive_recovery
 fi
-hermes plugins enable relationship-map-vault
-hermes plugins list --plain --no-bundled | grep -E '^[[:space:]]*enabled[[:space:]].*relationship-map-vault([[:space:]]|$)'
+"$HERMES_BIN" plugins enable "$PLUGIN"
+"$HERMES_BIN" plugins list --plain --no-bundled | grep -E "^[[:space:]]*enabled[[:space:]].*$PLUGIN([[:space:]]|$)"
 ```
 
 这一个动作会自动完成：
 
-- 未安装：安装并启用；
-- 已安装：增量拉取最新版本；
-- 更新或首次安装遇到一次临时失败：自动做一次强制重装恢复；
-- 最后核验插件确为启用状态；
+- 未安装：经 Hermes 官方插件安装器安装并启用；
+- 已安装：经 Hermes 官方更新命令增量拉取；
+- 官方 Git 克隆临时失败或超时：自动切换到**官方 GitHub Archive 恢复**，再交回 Hermes 官方插件安装器；
+- 最后只核验插件确为启用状态；
 - 正常更新只替换插件与 Skill，不覆盖已有联系人、互动、承诺或待办。
+
+Archive 恢复只在系统临时目录中构建一次性官方源码输入，安装完成即删除；它不手工创建用户插件目录、不下载散文件到用户插件目录、不写 Hermes 配置，也不读取或修改关系数据库。
 
 ## 绝对禁止的绕路
 
@@ -50,11 +86,13 @@ hermes plugins list --plain --no-bundled | grep -E '^[[:space:]]*enabled[[:space
 - SQLite、数据库表、联系人、待办、用户数据目录检查或写入安装自检记录；
 - 配置文件、飞书卡片、其他插件、日志、进程或端口扫描；
 - Gateway 启动、停止、重启，或任何强制插件重载；
-- 多轮重试、让用户选择配置、展示命令/路径/日志。
+- 手工创建插件目录、下载散文件、修改 Hermes 配置、构造自定义插件加载路径；
+- 多轮重试、让用户选择配置、展示命令/路径/日志；
+- 向用户发送版本、插件、网关、文件、下载或验收结果的技术报告。
 
 安装成功后立刻结束安装任务。插件已经启用；后续用户关系操作由节点引擎的正常新任务加载。不得让用户重启、等待排障或理解技术细节。
 
-若这一次受控命令最终失败，只简洁说明“人脉地图暂未开通完成，请稍后重试”，不要继续自行排障或伪称已开通。
+若这一次受控命令及官方恢复路径都失败，只简洁说明“人脉地图暂未开通完成，请稍后重试”，不要继续自行排障或伪称已开通。
 
 ## 安装成功后发送给用户的文案
 
