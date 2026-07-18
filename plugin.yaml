@@ -1,7 +1,7 @@
 name: relationship-map-vault
-version: 3.0.0
+version: 3.0.3
 manifest_version: 1
-description: "Durable relationship-map capability package. Bundles a governed local relationship vault, six constrained Hermes tools, automatic user-visible recording markers, and a companion Skill."
+description: "Durable relationship-map capability package with nine governed relationship-asset tools, visible recording markers, and a bundled Skill."
 author: Node Engine
 license: MIT
 provides_tools:

@@ -1,20 +1,24 @@
 # 人脉地图能力包安装契约
 
-正式用户入口：
+正式用户智能体链接：
 
-`https://github.com/xyxw1234-bot/relationship-map-skill`
+`https://raw.githubusercontent.com/xyxw1234-bot/relationship-map-skill/v3.0.3/SKILL.md`
+
+能力包标识：`relationship-map-vault@3.0.3`。
 
 ## 接收智能体的固定动作
 
 当用户明确说“安装人脉地图”“更新人脉地图”或发送本仓库链接时：
 
-1. 读取本文件和 `relationship_map_plugin/plugin.yaml`，确认名称、版本和来源；
+1. 读取本文件、根目录 `plugin.yaml` 与根目录 `SKILL.md`，确认名称、版本和来源均为 `relationship-map-vault@3.0.3`；
 2. 使用 Hermes 官方插件安装能力安装或更新本仓库根目录的插件；
 3. 确保插件启用，并在新的 Hermes 会话或重启后的网关中加载；
-4. 初始化当前用户的关系资产库；
-5. 执行一次真实自检：写入一条隔离的安装自检记录后清理，不得污染用户联系人；
-6. 验证捆绑 Skill 可用；
-7. 只向用户回复“人脉地图已开通”及简短用法，不展示技术细节。
+4. 确认已注册 `relationship-map-vault:relationship-map` Skill；
+5. 初始化当前用户的关系资产库；
+6. 执行一次真实自检：写入一条隔离的安装自检记录后清理，不得污染用户联系人；
+7. 验证捆绑 Skill 与九项 `relationship_map_*` 工具可用；
+8. 展示插件随安装自动输出的“人脉地图已开通”使用攻略；
+9. 只向用户回复“人脉地图已开通”及简短用法，不展示技术细节。
 
 ## 数据不丢失规则
 

@@ -1,7 +1,7 @@
 ---
 name: relationship-map-installer
 description: Use when a user sends the official Relationship Map capability package link or asks to install or update 人脉地图. Install the declared plugin package first, then expose the bundled durable Skill; never claim persistence if the vault tools are unavailable.
-version: 3.0.0
+version: 3.0.3
 author: Node Engine
 license: MIT
 metadata:
@@ -14,7 +14,7 @@ metadata:
 
 当用户明确要求安装、更新人脉地图，或发送本仓库链接时，读取仓库根目录 `INSTALL.md` 并执行其中的安装契约。
 
-安装目标是仓库内的 `relationship_map_plugin` 能力包，而不是只复制本文件。安装必须同时获得：
+安装目标是仓库根目录的 `relationship-map-vault` Hermes 插件，而不是只复制本文件。安装必须同时获得：
 
 - `relationship-map-vault` 插件；
 - 插件捆绑的 `relationship-map` Skill；

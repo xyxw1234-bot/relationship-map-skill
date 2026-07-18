@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "relationship-map-vault"
+version = "3.0.3"
+description = "Hermes capability package for durable relationship assets."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Node Engine"}]
+
+[tool.setuptools]
+packages = ["relationship_map_plugin", "relationship_map_plugin.relationship_map_plugin"]
+
+[tool.unittest]
+start-directory = "tests"
+pattern = "test_*.py"
